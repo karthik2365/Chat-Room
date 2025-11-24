@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Chat – {{ room_name }}</title>
+    <style>
+      body { font-family: sans-serif; }
+      #messages {
+        border: 1px solid #ccc;
+        height: 300px;
+        overflow-y: auto;
+        padding: 8px;
+        margin-top: 8px;
+        margin-bottom: 8px;
+      }
+      .my { text-align: right; }
+      .other { text-align: left; }
+      code {
+        display: inline-block;
+        max-width: 100%;
+        word-wrap: break-word;
+        font-size: 11px;
+        background: #f5f5f5;
+        padding: 2px 4px;
+      }
+      .meta {
+        font-size: 12px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Room: {{ room_name }}</h1>
+    <p>Logged in as: {{ request.user.username }} (id: {{ request.user.id }})</p>
+
+    <h3>Your Public Key</h3>
+    <code id="my-public-key">loading…</code>
+
+    <h3>Send To</h3>
+    <p class="meta">Receiver user id (for routing/backend):</p>
+    <input id="receiver-id" type="number" />
+
+    <p class="meta" style="margin-top:8px;">
+      Receiver public key (paste from other user):
+    </p>
+    <input
+      id="receiver-public-key"
+      type="text"
+      style="width: 100%;"
+      placeholder="Paste receiver's public key here..."
+    />
+
+    <div id="messages"></div>
+
+    <form id="chat-form">
+      <input id="message-input" autocomplete="off" placeholder="Type message..." />
+      <button type="submit">Encrypt &amp; Send</button>
+    </form>
+
+    <script>
+      const roomName = "{{ room_name }}";
+      const currentUserId = {{ request.user.id }};
+      const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+
+      const messagesDiv = document.getElementById("messages");
+      const form = document.getElementById("chat-form");
+      const messageInput = document.getElementById("message-input");
+      const receiverIdInput = document.getElementById("receiver-id");
+      const receiverPubInput = document.getElementById("receiver-public-key");
+      const myPubElem = document.getElementById("my-public-key");
+
+      // one-time safety: make sure old localStorage privateKey (if any) is removed
+      localStorage.removeItem("privateKey");
+
+      // ---------- IndexedDB helpers for private key ----------
+
+      const DB_NAME = "secure_chat";
+      const DB_VERSION = 1;
+      const STORE_NAME = "keys";
+      const PRIVATE_KEY_ID = "privateKey";
+
+      function openDB() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+          request.onupgradeneeded = function (event) {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              db.createObjectStore(STORE_NAME);
+            }
+          };
+
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      async function savePrivateKeyToDB(privateKeyBase64) {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, "readwrite");
+          const store = tx.objectStore(STORE_NAME);
+          store.put(privateKeyBase64, PRIVATE_KEY_ID);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+
+      async function getPrivateKeyFromDB() {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, "readonly");
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.get(PRIVATE_KEY_ID);
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      // ---------- Helpers: base64 <-> ArrayBuffer ----------
+
+      function arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+      }
+
+      function base64ToArrayBuffer(base64) {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes.buffer;
+      }
+
+      // ---------- Web Crypto: key gen / import / encrypt / decrypt ----------
+
+      async function generateKeyPair() {
+        const keyPair = await window.crypto.subtle.generateKey(
+          {
+            name: "RSA-OAEP",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([1, 0, 1]),
+            hash: "SHA-256",
+          },
+          true,
+          ["encrypt", "decrypt"]
+        );
+
+        const publicKey = await window.crypto.subtle.exportKey(
+          "spki",
+          keyPair.publicKey
+        );
+        const privateKey = await window.crypto.subtle.exportKey(
+          "pkcs8",
+          keyPair.privateKey
+        );
+
+        return {
+          publicKeyBase64: arrayBufferToBase64(publicKey),
+          privateKeyBase64: arrayBufferToBase64(privateKey),
+        };
+      }
+
+      async function importPublicKey(publicKeyBase64) {
+        return await window.crypto.subtle.importKey(
+          "spki",
+          base64ToArrayBuffer(publicKeyBase64),
+          { name: "RSA-OAEP", hash: "SHA-256" },
+          false,
+          ["encrypt"]
+        );
+      }
+
+      async function importPrivateKey(privateKeyBase64) {
+        return await window.crypto.subtle.importKey(
+          "pkcs8",
+          base64ToArrayBuffer(privateKeyBase64),
+          { name: "RSA-OAEP", hash: "SHA-256" },
+          false,
+          ["decrypt"]
+        );
+      }
+
+      async function encryptWithPublicKey(publicKeyBase64, plaintext) {
+        const publicKey = await importPublicKey(publicKeyBase64);
+        const encoded = new TextEncoder().encode(plaintext);
+        const ciphertext = await window.crypto.subtle.encrypt(
+          { name: "RSA-OAEP" },
+          publicKey,
+          encoded
+        );
+        return arrayBufferToBase64(ciphertext);
+      }
+
+      async function decryptWithPrivateKey(privateKeyBase64, ciphertextBase64) {
+        const privateKey = await importPrivateKey(privateKeyBase64);
+        const ciphertext = base64ToArrayBuffer(ciphertextBase64);
+        const plaintextBuffer = await window.crypto.subtle.decrypt(
+          { name: "RSA-OAEP" },
+          privateKey,
+          ciphertext
+        );
+        return new TextDecoder().decode(plaintextBuffer);
+      }
+
+      // ---------- CSRF helper for POST to Django ----------
+
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(";").shift();
+      }
+
+      // ---------- Ensure this browser has keys & upload public key ----------
+
+      async function ensureLocalKeysAndUpload() {
+        let publicKeyBase64 = localStorage.getItem("publicKey");
+        let privateKeyBase64 = await getPrivateKeyFromDB();
+
+        if (!publicKeyBase64 || !privateKeyBase64) {
+          console.log("Generating new keypair...");
+          const keys = await generateKeyPair();
+          publicKeyBase64 = keys.publicKeyBase64;
+          privateKeyBase64 = keys.privateKeyBase64;
+
+          // public key can live in localStorage
+          localStorage.setItem("publicKey", publicKeyBase64);
+
+          // private key ONLY in IndexedDB
+          await savePrivateKeyToDB(privateKeyBase64);
+
+          const csrftoken = getCookie("csrftoken");
+          await fetch("/api/me/public-key/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": csrftoken,
+            },
+            body: JSON.stringify({ public_key: publicKeyBase64 }),
+          }).catch((e) =>
+            console.warn("Upload public key failed (dev only):", e)
+          );
+
+          console.log("Generated new keypair and uploaded public key");
+        } else {
+          console.log("Using existing keypair from IndexedDB/localStorage");
+        }
+
+        // show my public key in UI
+        myPubElem.textContent = publicKeyBase64;
+      }
+
+      // ---------- Default receiver id from room name ----------
+
+      (function setDefaultReceiver() {
+        try {
+          const parts = roomName.split("_"); // ["dm", "1", "2"]
+          const a = parseInt(parts[1], 10);
+          const b = parseInt(parts[2], 10);
+          const otherId = currentUserId === a ? b : a;
+          receiverIdInput.value = otherId;
+        } catch (e) {
+          console.warn("Could not parse roomName", e);
+        }
+      })();
+
+      // ---------- Main async init ----------
+
+      (async function init() {
+        await ensureLocalKeysAndUpload();
+
+        const privateKeyBase64 = await getPrivateKeyFromDB();
+        if (!privateKeyBase64) {
+          alert("No private key found, reload the page.");
+          return;
+        }
+
+        const chatSocket = new WebSocket(
+          wsScheme + "://" + window.location.host + "/ws/chat/" + roomName + "/"
+        );
+
+        chatSocket.onopen = function () {
+          console.log("WebSocket connected");
+        };
+
+        chatSocket.onclose = function (e) {
+          console.log("WebSocket closed", e);
+        };
+
+        chatSocket.onerror = function (e) {
+          console.error("WebSocket error", e);
+        };
+
+        // Show each message encrypted with a "Decrypt" button
+        chatSocket.onmessage = function (e) {
+          console.log("Received raw:", e.data);
+          const data = JSON.parse(e.data);
+
+          const wrapper = document.createElement("div");
+          wrapper.className = data.sender === currentUserId ? "my" : "other";
+
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          meta.textContent = `from ${data.sender} to ${data.receiver}`;
+
+          const textSpan = document.createElement("span");
+          textSpan.textContent = data.ciphertext; // ciphertext by default
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = "Decrypt";
+
+          btn.onclick = async () => {
+            try {
+              const plaintext = await decryptWithPrivateKey(
+                privateKeyBase64,
+                data.ciphertext
+              );
+              textSpan.textContent = plaintext;
+              btn.disabled = true;
+              btn.textContent = "Decrypted";
+            } catch (err) {
+              console.error("Decrypt failed:", err);
+              alert("Could not decrypt – is this really for you?");
+            }
+          };
+
+          wrapper.appendChild(meta);
+          wrapper.appendChild(textSpan);
+          wrapper.appendChild(document.createTextNode(" "));
+          wrapper.appendChild(btn);
+
+          messagesDiv.appendChild(wrapper);
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        };
+
+        // Encrypt with receiver's PUBLIC key typed in the input
+        form.onsubmit = async function (e) {
+          e.preventDefault();
+          const text = messageInput.value.trim();
+          const receiverId = parseInt(receiverIdInput.value, 10);
+          const receiverPubKey = receiverPubInput.value.trim();
+
+          if (!text || !receiverId || !receiverPubKey) {
+            alert("Please enter message, receiver id and receiver public key.");
+            return;
+          }
+
+          try {
+            const ciphertext = await encryptWithPublicKey(
+              receiverPubKey,
+              text
+            );
+
+            const payload = {
+              sender: currentUserId,
+              receiver: receiverId,
+              ciphertext: ciphertext,
+            };
+
+            console.log("Sending encrypted:", payload);
+            chatSocket.send(JSON.stringify(payload));
+            messageInput.value = "";
+          } catch (err) {
+            console.error("Could not encrypt/send message:", err);
+            alert("Error: " + err.message);
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>
