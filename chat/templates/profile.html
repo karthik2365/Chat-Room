@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Chat – Home</title>
+    <title>Secure Chat – Profile</title>
 
     <style>
         body {
@@ -42,6 +42,15 @@
             font-weight: 600;
         }
 
+        .center {
+            text-align: center;
+        }
+
+        .muted {
+            font-size: 14px;
+            color: #555;
+        }
+
         .btn {
             display: inline-block;
             margin-top: 16px;
@@ -55,43 +64,27 @@
         .btn:hover {
             opacity: 0.85;
         }
-
-        .center {
-            text-align: center;
-        }
-
-        .muted {
-            font-size: 14px;
-            color: #555;
-        }
     </style>
 </head>
 
 <body>
     <div class="container">
 
-        <h1>Secure Chat</h1>
+        <h1>Your Profile</h1>
 
-        {% if username %}
-            <p class="center muted">Welcome, <strong>{{ username }}</strong></p>
+        <p class="center muted">Username: <strong>{{ username }}</strong></p>
 
-            <p class="muted">Your Public Key:</p>
-            <pre>{{ public_key|default:"(no public key uploaded)" }}</pre>
 
-            <div class="center">
-                <a class="btn" href="{% url 'chat_room' room_name='dm_1_2' %}">
-                    Open Test Chat
-                </a>
-            </div>
+        <p class="muted">Your Public Key:</p>
+        <pre id="public-key">{{ public_key }}</pre>
 
-            <p class="center" style="margin-top:20px;">
-                <a href="{% url 'login' %}">Logout</a>
-            </p>
+        <button onclick="window.location.href='{% url "chat_room" room_name="dm_1_2" %}'">
+            Open Chat Room
+        </button>
 
-        {% else %}
-            <p class="center">You are not logged in.</p>
-            <p class="center"><a href="{% url 'home' %}">Login</a></p>
-        {% endif %}
+        <div class="center" style="margin-top:20px;">
+            <a href="{% url 'login' %}" class="btn">Logout</a>
+        </div>
 
     </div>
 </body>

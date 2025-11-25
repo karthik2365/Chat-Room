@@ -1,29 +1,110 @@
 <!DOCTYPE html>
-<html>
-  <head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Chat – Login</title>
-  </head>
-  <body>
-    <h1>Login</h1>
 
-    {% if form.errors %}
-      <p style="color:red;">Invalid username or password.</p>
-    {% endif %}
+    <style>
+        body {
+            margin: 0;
+            padding: 40px 20px;
+            font-family: Arial, sans-serif;
+            background: #ffffff;
+            color: #000000;
+            display: flex;
+            justify-content: center;
+        }
 
-    <form method="post">
-      {% csrf_token %}
-      <p>
-        <label>Username:</label><br />
-        {{ form.username }}
-      </p>
-      <p>
-        <label>Password:</label><br />
-        {{ form.password }}
-      </p>
+        .container {
+            width: 100%;
+            max-width: 400px;
+        }
 
-      <button type="submit">Login</button>
-    </form>
+        h1 {
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
 
-    <p>New user? <a href="/register/">Sign up</a></p>
-  </body>
+        label {
+            font-size: 14px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 15px;
+            border: 1px solid #000;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            background: white;
+            color: black;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 15px;
+            border: none;
+            background: #000;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        .error {
+            color: red;
+            font-size: 14px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .footer {
+            margin-top: 16px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: #000;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <h1>Login</h1>
+
+        {% if form.errors %}
+            <div class="error">Invalid username or password.</div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+
+            <label>Username</label>
+            {{ form.username }}
+
+            <label>Password</label>
+            {{ form.password }}
+
+            <button type="submit">Login</button>
+        </form>
+
+        <div class="footer">
+            New user? <a href="/register/">Sign up</a>
+        </div>
+
+    </div>
+</body>
 </html>

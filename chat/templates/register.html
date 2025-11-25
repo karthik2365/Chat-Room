@@ -1,18 +1,101 @@
 <!DOCTYPE html>
-<html>
-  <head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Chat – Register</title>
-  </head>
-  <body>
-    <h1>Create a new account</h1>
 
-    <form method="post">
-      {% csrf_token %}
-      {{ form.as_p }}
+    <style>
+        body {
+            margin: 0;
+            padding: 40px 20px;
+            font-family: Arial, sans-serif;
+            background: #ffffff;
+            color: #000000;
+            display: flex;
+            justify-content: center;
+        }
 
-      <button type="submit">Sign up</button>
-    </form>
+        .container {
+            width: 100%;
+            max-width: 450px;
+        }
 
-    <p>Already have an account? <a href="/accounts/login/">Login here</a></p>
-  </body>
+        h1 {
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 15px;
+            border: 1px solid #000;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            background: white;
+            color: black;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 15px;
+            border: none;
+            background: #000;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        .footer {
+            margin-top: 16px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: #000;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <h1>Create Account</h1>
+
+        <form method="post">
+            {% csrf_token %}
+
+            {{ form.non_field_errors }}
+
+            {% for field in form %}
+                <label>{{ field.label }}</label>
+                {{ field }}
+            {% endfor %}
+
+            <button type="submit">Sign Up</button>
+        </form>
+
+        <div class="footer">
+            Already have an account? <a href="/accounts/login/">Login</a>
+        </div>
+
+    </div>
+</body>
 </html>
