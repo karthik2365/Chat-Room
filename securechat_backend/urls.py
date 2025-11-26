@@ -20,24 +20,16 @@ from chat.views import home, register, user_public_key, MePublicKeyView, MePubli
 
 
 urlpatterns = [
-    # path('admin/', admin.site.urls),
-
+    path("admin/", admin.site.urls),
     path("", home, name="home"),
     path("register/", register, name="register"),
-
+    path("profile/", profile_view, name="profile"),
+    
     # built-in auth views: /login/, /logout/, /password_change/, etc.
     path("accounts/", include("django.contrib.auth.urls")),
     path("chat/<str:room_name>/", chat_room, name="chat_room"),
 
     path('api/users/', UserPublicListView.as_view()),
-
     path("api/me/public-key/", MePublicKeyView.as_view(), name="me-public-key"),
     path("api/users/<int:pk>/public-key/", UserPublicKeyView.as_view(), name="user-public-key"),
-
-    path("admin/", admin.site.urls),
-
-path('', home, name="home"),
-path('profile/', profile_view, name="profile"),
-    path("", include("chat.urls")),
-
 ]
