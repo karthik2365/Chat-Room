@@ -44,6 +44,14 @@ INSTALLED_APPS = [
     'chat',
 ]
 
+import os
+
+# Example: set ALLOWED_HOSTS env var to "chat-room-2-xr3y.onrender.com,localhost,127.0.0.1"
+raw_hosts = os.environ.get("ALLOWED_HOSTS", "")
+if raw_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(",") if h.strip()]
+else:
+    ALLOWED_HOSTS = []
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
