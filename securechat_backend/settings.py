@@ -33,7 +33,28 @@ _raw_hosts = os.environ.get("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(",") if h.strip()]
 
 # Fallback when nothing is set (useful for local dev)
-if not ALLOWED_HOSTS:
+# settings.py (after ALLOWED_HOSTS is defined)
+
+# For Django >= 4.0, CSRF_TRUSTED_ORIGINS must include scheme (http/https)
+# If you set ALLOWED_HOSTS via env var, we'll build CSRF_TRUSTED_ORIGINS from it.
+_raw_hosts = os.environ.get("ALLOWED_HOSTS", "")
+hosts = [h.strip() for h in _raw_hosts.split(",") if h.strip()]
+
+# Ensure fallback for local development
+if not hosts:
+    hosts = ["127.0.0.1", "localhost"]
+
+# Build trusted origins with scheme
+CSRF_TRUSTED_ORIGINS = []
+for h in hosts:
+    if h.startswith("http://") or h.startswith("https://"):
+        CSRF_TRUSTED_ORIGINS.append(h)
+    else:
+        # assume https for deployed hosts and http for localhost
+        if "localhost" in h or h.startswith("127.0.0.1"):
+            CSRF_TRUSTED_ORIGINS.append("http://" + h)
+        else:
+            CSRF_TRUSTED_ORIGINS.append("https://" + h)
     ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
