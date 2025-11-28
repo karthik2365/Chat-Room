@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from chat.views import home, register, user_public_key, MePublicKeyView, MePublicKeyUpdateView, UserPublicListView, chat_room, UserPublicKeyView, profile_view
+from chat.views import home, register, MePublicKeyView, UserPublicListView, chat_room, UserPublicKeyView, profile_view
 
 
 urlpatterns = [

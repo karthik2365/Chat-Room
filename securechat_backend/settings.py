@@ -27,7 +27,12 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-a4d#!!xe2l+aucw(gfpw!
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# Example: set ALLOWED_HOSTS env var to "chat-room-2-xr3y.onrender.com,localhost,127.0.0.1"
+raw_hosts = os.environ.get("ALLOWED_HOSTS", "")
+if raw_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(",") if h.strip()]
+else:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -43,15 +48,6 @@ INSTALLED_APPS = [
     'channels',
     'chat',
 ]
-
-import os
-
-# Example: set ALLOWED_HOSTS env var to "chat-room-2-xr3y.onrender.com,localhost,127.0.0.1"
-raw_hosts = os.environ.get("ALLOWED_HOSTS", "")
-if raw_hosts:
-    ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(",") if h.strip()]
-else:
-    ALLOWED_HOSTS = []
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
