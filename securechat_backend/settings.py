@@ -28,11 +28,13 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-a4d#!!xe2l+aucw(gfpw!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Example: set ALLOWED_HOSTS env var to "chat-room-2-xr3y.onrender.com,localhost,127.0.0.1"
-raw_hosts = os.environ.get("ALLOWED_HOSTS", "")
-if raw_hosts:
-    ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(",") if h.strip()]
-else:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+# Parse ALLOWED_HOSTS from env; accept a comma-separated string
+_raw_hosts = os.environ.get("ALLOWED_HOSTS", "")
+ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(",") if h.strip()]
+
+# Fallback when nothing is set (useful for local dev)
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
 # Application definition
